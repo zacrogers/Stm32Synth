@@ -29,6 +29,7 @@
 
 #include "nco.h"
 #include "synth.h"
+#include "circ_buffer.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -76,15 +77,6 @@ static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 void calc_sine(float samp_dt, uint16_t samp_N);
 void lcd_loop_write();
-//void note_on(float freq);
-//void midi_to_freq(int note);
-
-//float midi_to_freq(int note)
-//{
-//	return (440.0 / 32.0) * pow(2, ((note - 9.0) / 12.0));
-//}
-
-//void TIM2_IRQHandler(void);
 void TIM6_IRQHandler(void);
 
 /* USER CODE END PFP */
@@ -100,6 +92,9 @@ I2C_LCD lcd = {.address = (0x27 << 1),
 
 NCO oscillator = {0};
 
+#define A_BUFF_SIZE 10
+uint16_t audio_buff [A_BUFF_SIZE];
+cbuff_handle audio_cbuff;
 
 #define SAMPLE_N 250
 
@@ -182,6 +177,8 @@ int main(void)
   // Init oscilllator stuff
   NCO_init(&oscillator, 40000);
   NCO_set_freq(&oscillator, 500);
+
+  audio_cbuff = cbuff_init(audio_buff, A_BUFF_SIZE);
 
   /* USER CODE END 2 */
 
@@ -514,24 +511,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, sig);//sine_val[sin_index]);
 	}
 }
-//void TIM2_IRQHandler(void)
-//{
-//	if	(htim->Instance == TIM2)
-//	{
-//		sig = NCO_next_signal(&oscillator);
-//		HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, sig);//sine_val[sin_index]);
-//	}
-//}
-
-//
-//void note_on(float freq)
-//{
-//	float samp_dt = freq/F_SAMPLE;
-//	float samp_N = F_SAMPLE/freq;
-//
-//	calc_sine(samp_dt, samp_N);
-//	HAL_DAC_Start_DMA (&hdac1, DAC_CHANNEL_1, (uint32_t *)dataI2S, 10, DAC_ALIGN_12B_R);
-//}
 
 /* USER CODE END 4 */
 
