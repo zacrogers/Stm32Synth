@@ -29,6 +29,7 @@
 
 #include "nco.h"
 #include "synth.h"
+#include "adsr.h"
 #include "circ_buffer.h"
 /* USER CODE END Includes */
 
@@ -91,6 +92,7 @@ I2C_LCD lcd = {.address = (0x27 << 1),
 
 
 NCO oscillator = {0};
+ADSR adsr = {0};
 
 #define A_BUFF_SIZE 10
 uint16_t audio_buff [A_BUFF_SIZE];
@@ -178,6 +180,8 @@ int main(void)
   NCO_init(&oscillator, 40000);
   NCO_set_freq(&oscillator, 500);
 
+  ADSR_init(&adsr, 40000, 1000, 1, 50);
+
   audio_cbuff = cbuff_init(audio_buff, A_BUFF_SIZE);
 
   /* USER CODE END 2 */
@@ -195,12 +199,21 @@ int main(void)
 //		  HAL_GPIO_TogglePin(GPIOB, LED_onboard_Pin);
 //	  }
 
-	  volatile int del;
-	  for(int i = 0; i< 8; ++i)
-	  {
-		  NCO_set_freq(&oscillator, (int)midi_to_freq(sequence[i]));
-		  for(del = 0; del< 100000; ++del);
-	  }
+	  NCO_set_freq(&oscillator, (int)midi_to_freq(69));
+
+//	  volatile int del;
+//	  for(int i = 0; i< 8; ++i)
+//	  {
+//		  NCO_set_freq(&oscillator, (int)midi_to_freq(sequence[i]));
+//		  for(del = 0; del< 500000; ++del);
+//	  }
+
+//	  volatile int del;
+//	  for(int i = 0; i< 8; ++i)
+//	  {
+//		  ADSR_note_on(&adsr);
+//		  for(del = 0; del< 100000; ++del);
+//	  }
 
 
 //		itoa(sin_index, str_num, 10);
@@ -502,13 +515,31 @@ static void MX_GPIO_Init(void)
 
 }
 
+volatile int env_cnt = 0;
+volatile float env_step = 1/10000;
+volatile float new_sig;
+
+#define ATTACK_STEP 40000
+
 /* USER CODE BEGIN 4 */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if	(htim->Instance == TIM2)
 	{
 		sig = NCO_next_signal(&oscillator);
-		HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, sig);//sine_val[sin_index]);
+		new_sig = sig * env_cnt / ATTACK_STEP;
+//		new_sig = sig * ADSR_get_next(&adsr);
+		HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, (uint32_t)new_sig>>1);//sine_val[sin_index]);
+
+		if(env_cnt < ATTACK_STEP-1)
+		{
+			env_cnt++;
+		}
+		else
+		{
+			env_cnt = 0;
+		}
+
 	}
 }
 
