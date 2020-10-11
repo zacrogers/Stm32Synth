@@ -97,7 +97,6 @@ void NCO_set_freq(NCO *nco, float freq)
 {
 	float phase_word = freq * ((float)65536/(float)nco->clock_freq);
 //	float phase_word = (float)freq / (float)65536/(float)nco->clock_freq;
-//	nco->delta_phase = 1;//(freq / (LUT_LENGTH / pow(2, PHASE_ACC_WIDTH)));
-	nco->delta_phase = phase_word;//(uint16_t)phase_word;
+	nco->delta_phase = phase_word;
 }
 

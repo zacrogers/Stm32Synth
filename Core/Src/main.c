@@ -45,9 +45,6 @@
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
 #define PI       3.14159f
-//Sample rate and Output freq
-#define F_SAMPLE 44100.0f
-#define F_OUT	 200.0f
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -61,7 +58,6 @@ TIM_HandleTypeDef htim2;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-volatile int32_t dataI2S[100];
 volatile int time = 0;
 
 char str_num[10]; // Buffer for storing numbers to show on lcd
@@ -76,7 +72,6 @@ static void MX_TIM2_Init(void);
 static void MX_DMA_Init(void);
 static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
-void calc_sine(float samp_dt, uint16_t samp_N);
 void lcd_loop_write();
 void TIM6_IRQHandler(void);
 
@@ -97,18 +92,6 @@ ADSR adsr = {0};
 #define A_BUFF_SIZE 10
 uint16_t audio_buff [A_BUFF_SIZE];
 cbuff_handle audio_cbuff;
-
-#define SAMPLE_N 250
-
-uint32_t sine_val[SAMPLE_N];
-
-void calcsin ()
-{
-	for (int i=0; i<SAMPLE_N; i++)
-	{
-		sine_val[i] = ((sin(i*2*PI/SAMPLE_N) + 1)*(4096/2));
-	}
-}
 
 
 volatile int sin_index = 0;
@@ -164,14 +147,7 @@ int main(void)
 //  LCD_DisableCursor(&lcd);
 //  LCD_SendString(&lcd, "Sine Freq");
 
-//  HAL_TIM_Base_Start(&htim2);
 
-//  note_on(440);
-
-//  HAL_TIM_Base_Start(&htim2);
-//
-  calcsin();
-//    HAL_TIM_Base_Start(&htim2);
   HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
 //
 //  HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, sine_val, SAMPLE_N, DAC_ALIGN_12B_R);
@@ -201,16 +177,10 @@ int main(void)
 
 	  NCO_set_freq(&oscillator, (int)midi_to_freq(69));
 
-//	  volatile int del;
-//	  for(int i = 0; i< 8; ++i)
-//	  {
-//		  NCO_set_freq(&oscillator, (int)midi_to_freq(sequence[i]));
-//		  for(del = 0; del< 500000; ++del);
-//	  }
-
 	  volatile int del;
 //	  for(int i = 0; i< 8; ++i)
 //	  {
+//		  NCO_set_freq(&oscillator, (int)midi_to_freq(sequence[i]));
 		  ADSR_note_on(&adsr);
 		  for(del = 0; del< 2000000; ++del);
 		  ADSR_note_off(&adsr);
@@ -220,8 +190,6 @@ int main(void)
 
 //		itoa(sin_index, str_num, 10);
 //		itoa(TIM2->CNT, str_num, 10);
-
-
 
 //	  	itoa(count, str_num, 10);
 //

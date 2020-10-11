@@ -70,7 +70,7 @@ float ADSR_get_next(ADSR *adsr)
 		{
 			if(adsr->amplitude > adsr->sustain)
 			{
-				adsr->amplitude = 1.0 - ((float)adsr->tick / (float)adsr->decay);// + adsr->sustain;
+				adsr->amplitude = 1.0 - ((float)adsr->tick / (float)adsr->decay);
 			}
 
 			if(adsr->tick < adsr->decay-1)
