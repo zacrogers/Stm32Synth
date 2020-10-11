@@ -180,7 +180,7 @@ int main(void)
   NCO_init(&oscillator, 40000);
   NCO_set_freq(&oscillator, 500);
 
-  ADSR_init(&adsr, 40000, 1000, 1, 50);
+  ADSR_init(&adsr, 20000, 20000, 0.8, 10000);
 
   audio_cbuff = cbuff_init(audio_buff, A_BUFF_SIZE);
 
@@ -208,11 +208,13 @@ int main(void)
 //		  for(del = 0; del< 500000; ++del);
 //	  }
 
-//	  volatile int del;
+	  volatile int del;
 //	  for(int i = 0; i< 8; ++i)
 //	  {
-//		  ADSR_note_on(&adsr);
-//		  for(del = 0; del< 100000; ++del);
+		  ADSR_note_on(&adsr);
+		  for(del = 0; del< 2000000; ++del);
+		  ADSR_note_off(&adsr);
+		  for(del = 0; del< 2000000; ++del);
 //	  }
 
 
@@ -515,11 +517,7 @@ static void MX_GPIO_Init(void)
 
 }
 
-volatile int env_cnt = 0;
-volatile float env_step = 1/10000;
 volatile float new_sig;
-
-#define ATTACK_STEP 40000
 
 /* USER CODE BEGIN 4 */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
@@ -527,19 +525,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	if	(htim->Instance == TIM2)
 	{
 		sig = NCO_next_signal(&oscillator);
-		new_sig = sig * env_cnt / ATTACK_STEP;
-//		new_sig = sig * ADSR_get_next(&adsr);
-		HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, (uint32_t)new_sig>>1);//sine_val[sin_index]);
-
-		if(env_cnt < ATTACK_STEP-1)
-		{
-			env_cnt++;
-		}
-		else
-		{
-			env_cnt = 0;
-		}
-
+		new_sig = sig * ADSR_get_next(&adsr);
+		HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, (uint32_t)new_sig>>2);
 	}
 }
 

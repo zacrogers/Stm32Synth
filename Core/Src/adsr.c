@@ -41,65 +41,72 @@ void  ADSR_note_off(ADSR *adsr)
 
 float ADSR_get_next(ADSR *adsr)
 {
-	adsr->amplitude = (adsr->tick/adsr->attack);
+	switch(adsr->state)
+	{
+		case ENV_INIT:
+		{
+			adsr->amplitude = 0.0;
+			break;
+		}
 
-	if(adsr->tick < adsr->attack-1)
-	{
-//				adsr->amplitude += (adsr->tick/adsr->attack);
-		adsr->tick++;
+		case ENV_ATTACK:
+		{
+			adsr->amplitude = ((float)adsr->tick / (float)adsr->attack);
+
+			if(adsr->tick < adsr->attack-1)
+			{
+				adsr->tick++;
+			}
+			else
+			{
+				adsr->tick = 0;
+				adsr->state = ENV_DECAY;
+			}
+
+			break;
+		}
+
+		case ENV_DECAY:
+		{
+			if(adsr->amplitude > adsr->sustain)
+			{
+				adsr->amplitude = 1.0 - ((float)adsr->tick / (float)adsr->decay);// + adsr->sustain;
+			}
+
+			if(adsr->tick < adsr->decay-1)
+			{
+				adsr->tick++;
+			}
+			else
+			{
+				adsr->tick = 0;
+				adsr->state = ENV_SUSTAIN;
+			}
+			break;
+		}
+
+		case ENV_SUSTAIN:
+		{
+			adsr->amplitude = adsr->sustain;
+			break;
+		}
+
+		case ENV_RELEASE:
+		{
+			adsr->amplitude = adsr->sustain - ((float)adsr->tick / (float)adsr->release);
+
+			if(adsr->tick < adsr->release-1)
+			{
+				adsr->tick++;
+			}
+			else
+			{
+				adsr->tick = 0;
+				adsr->state = ENV_INIT;
+			}
+			break;
+		}
 	}
-	else
-	{
-//		adsr->amplitude = 1.0;
-////				adsr->state = ENV_DECAY;
-//		adsr->state = ENV_SUSTAIN;
-		adsr->tick = 0;
-	}
-//	switch(adsr->state)
-//	{
-//		case ENV_INIT:
-//		{
-//			adsr->amplitude = 0.0;
-//			break;
-//		}
-//
-//		case ENV_ATTACK:
-//		{
-//			adsr->amplitude = (adsr->tick/adsr->attack);
-//
-//			if(adsr->tick < adsr->attack)
-//			{
-////				adsr->amplitude += (adsr->tick/adsr->attack);
-//				adsr->tick++;
-//			}
-//			else
-//			{
-//				adsr->amplitude = 1.0;
-////				adsr->state = ENV_DECAY;
-//				adsr->state = ENV_SUSTAIN;
-//				adsr->tick = 0;
-//			}
-////			adsr->tick++;
-//
-//			break;
-//		}
-//
-//		case ENV_DECAY:
-//		{
-//			break;
-//		}
-//
-//		case ENV_SUSTAIN:
-//		{
-//			adsr->amplitude = 1.0;
-//			break;
-//		}
-//
-//		case ENV_RELEASE:
-//		{
-//			break;
-//		}
-//	}
 
 	return adsr->amplitude;
 }
