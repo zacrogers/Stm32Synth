@@ -17,7 +17,6 @@
   ******************************************************************************
   */
 /* USER CODE END Header */
-
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
@@ -28,7 +27,7 @@
 #include <string.h>
 
 #include "nco.h"
-#include "synth.h"
+#include "midi.h"
 #include "adsr.h"
 #include "circ_buffer.h"
 /* USER CODE END Includes */
@@ -56,6 +55,7 @@ I2C_HandleTypeDef hi2c1;
 TIM_HandleTypeDef htim2;
 
 UART_HandleTypeDef huart1;
+DMA_HandleTypeDef hdma_usart1_rx;
 
 /* USER CODE BEGIN PV */
 volatile int time = 0;
@@ -74,6 +74,7 @@ static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 void lcd_loop_write();
 void TIM6_IRQHandler(void);
+void handle_midi(MIDI_Packet *packet);
 
 /* USER CODE END PFP */
 
@@ -100,8 +101,38 @@ volatile uint32_t sig = 0;
 //int sequence[8] = {440, 494, 532, 587, 659, 698, 784};
 int sequence[8] = {69, 71, 72, 74, 76, 77, 79};
 
+uint8_t uart_rx_data[MIDI_PACKET_SIZE];
+char* tx_rec = "Hello";
 
-uint8_t uart_rx_data[10];
+MIDI_Packet midi_packet = {0};
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+//	HAL_UART_Transmit(&huart1, uart_rx_data, 10, 1000);
+	midi_packet = midi_parse(uart_rx_data);
+	handle_midi(&midi_packet);
+	HAL_UART_Receive_IT(&huart1, uart_rx_data, MIDI_PACKET_SIZE);
+
+}
+
+void handle_midi(MIDI_Packet *packet)
+{
+	if(packet)
+	{
+		NCO_set_freq(&oscillator, (int)midi_to_freq(packet->note));
+
+		if(packet->control == MIDI_NOTE_ON)
+		{
+			ADSR_note_on(&adsr);
+		}
+		else if(packet->control == MIDI_NOTE_OFF)
+		{
+			ADSR_note_off(&adsr);
+		}
+	}
+
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -116,7 +147,6 @@ int main(void)
 //	int count = 0;
 
   /* USER CODE END 1 */
-  
 
   /* MCU Configuration--------------------------------------------------------*/
 
@@ -149,11 +179,13 @@ int main(void)
 
 
   HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
+
+  HAL_UART_Receive_IT(&huart1, uart_rx_data, 10);
 //
 //  HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, sine_val, SAMPLE_N, DAC_ALIGN_12B_R);
 
   // Init oscilllator stuff
-  NCO_init(&oscillator, 40000);
+  NCO_init(&oscillator, 40000, WF_SINE);
   NCO_set_freq(&oscillator, 500);
 
   ADSR_init(&adsr, 20000, 20000, 0.8, 10000);
@@ -166,26 +198,20 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-//	  char * msg = "Hello world\n\r";
-//	  HAL_UART_Transmit(&huart1, (uint8_t*)msg, 16, 1000);
-	  HAL_UART_Receive(&huart1, uart_rx_data, 10, 100);
 
-//	  if(strcmp(msg, "a") == 0)
-//	  {
-//		  HAL_GPIO_TogglePin(GPIOB, LED_onboard_Pin);
-//	  }
-
-	  NCO_set_freq(&oscillator, (int)midi_to_freq(69));
+//	  NCO_set_freq(&oscillator, (int)midi_to_freq(69));
 
 	  volatile int del;
-//	  for(int i = 0; i< 8; ++i)
-//	  {
-//		  NCO_set_freq(&oscillator, (int)midi_to_freq(sequence[i]));
+	  for(int i = 0; i< 8; ++i)
+	  {
+		  NCO_set_freq(&oscillator, (int)midi_to_freq(sequence[i]));
+
 		  ADSR_note_on(&adsr);
-		  for(del = 0; del< 2000000; ++del);
+		  for(del = 0; del< 1000000; ++del);
+
 		  ADSR_note_off(&adsr);
-		  for(del = 0; del< 2000000; ++del);
-//	  }
+		  for(del = 0; del< 1000000; ++del);
+	  }
 
 
 //		itoa(sin_index, str_num, 10);
@@ -234,7 +260,8 @@ void SystemClock_Config(void)
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
   RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
-  /** Initializes the CPU, AHB and APB busses clocks 
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
@@ -246,7 +273,7 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  /** Initializes the CPU, AHB and APB busses clocks 
+  /** Initializes the CPU, AHB and APB buses clocks
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
@@ -285,14 +312,14 @@ static void MX_DAC1_Init(void)
   /* USER CODE BEGIN DAC1_Init 1 */
 
   /* USER CODE END DAC1_Init 1 */
-  /** DAC Initialization 
+  /** DAC Initialization
   */
   hdac1.Instance = DAC1;
   if (HAL_DAC_Init(&hdac1) != HAL_OK)
   {
     Error_Handler();
   }
-  /** DAC channel OUT1 config 
+  /** DAC channel OUT1 config
   */
   sConfig.DAC_Trigger = DAC_TRIGGER_T2_TRGO;
   sConfig.DAC_OutputBuffer = DAC_OUTPUTBUFFER_ENABLE;
@@ -334,13 +361,13 @@ static void MX_I2C1_Init(void)
   {
     Error_Handler();
   }
-  /** Configure Analogue filter 
+  /** Configure Analogue filter
   */
   if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
   {
     Error_Handler();
   }
-  /** Configure Digital filter 
+  /** Configure Digital filter
   */
   if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK)
   {
@@ -436,10 +463,10 @@ static void MX_USART1_UART_Init(void)
 
 }
 
-/** 
+/**
   * Enable DMA controller clock
   */
-static void MX_DMA_Init(void) 
+static void MX_DMA_Init(void)
 {
 
   /* DMA controller clock enable */
@@ -449,6 +476,9 @@ static void MX_DMA_Init(void)
   /* DMA1_Channel3_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Channel3_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Channel3_IRQn);
+  /* DMA1_Channel5_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel5_IRQn);
 
 }
 
@@ -485,9 +515,9 @@ static void MX_GPIO_Init(void)
 
 }
 
-volatile float new_sig;
-
 /* USER CODE BEGIN 4 */
+
+volatile float new_sig;
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if	(htim->Instance == TIM2)
@@ -520,8 +550,8 @@ void Error_Handler(void)
   * @param  line: assert_param error line source number
   * @retval None
   */
-void assert_failed(char *file, uint32_t line)
-{ 
+void assert_failed(uint8_t *file, uint32_t line)
+{
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line number,
      tex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
