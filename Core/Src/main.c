@@ -86,35 +86,25 @@ I2C_LCD lcd = {.address = (0x27 << 1),
 			   .mode    = LCD_MODE_4BIT,
 			   .i2c_bus = &hi2c1};
 
-
-NCO oscillator = {0};
-ADSR adsr = {0};
-
-#define A_BUFF_SIZE 10
-uint16_t audio_buff [A_BUFF_SIZE];
-cbuff_handle audio_cbuff;
-
-
-volatile int sin_index = 0;
-volatile uint32_t sig = 0;
-
-//int sequence[8] = {440, 494, 532, 587, 659, 698, 784};
-int sequence[8] = {69, 71, 72, 74, 76, 77, 79};
-
-uint8_t uart_rx_data[MIDI_PACKET_SIZE];
-char* tx_rec = "Hello";
-
+NCO         oscillator  = {0};
+ADSR        adsr        = {0};
 MIDI_Packet midi_packet = {0};
 
+
+volatile uint32_t sig = 0; // For storing oscillator signal
+uint8_t uart_rx_data[MIDI_PACKET_SIZE]; // Received UART data
+
+int sequence[8] = {69, 71, 72, 74, 76, 77, 79};
+
+/* Midi serial data packet receive callback */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-//	HAL_UART_Transmit(&huart1, uart_rx_data, 10, 1000);
 	midi_packet = midi_parse(uart_rx_data);
 	handle_midi(&midi_packet);
 	HAL_UART_Receive_IT(&huart1, uart_rx_data, MIDI_PACKET_SIZE);
-
 }
 
+/* Control oscillator and envelope from received midi data */
 void handle_midi(MIDI_Packet *packet)
 {
 	if(packet)
@@ -125,12 +115,11 @@ void handle_midi(MIDI_Packet *packet)
 		{
 			ADSR_note_on(&adsr);
 		}
-		else if(packet->control == MIDI_NOTE_OFF)
+		if(packet->control == MIDI_NOTE_OFF)
 		{
 			ADSR_note_off(&adsr);
 		}
 	}
-
 }
 
 /* USER CODE END 0 */
@@ -142,9 +131,6 @@ void handle_midi(MIDI_Packet *packet)
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-//	char count_label[10] = "Count:";
-//	char lcd_disp[10] = "";
-//	int count = 0;
 
   /* USER CODE END 1 */
 
@@ -180,17 +166,14 @@ int main(void)
 
   HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
 
-  HAL_UART_Receive_IT(&huart1, uart_rx_data, 10);
-//
-//  HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, sine_val, SAMPLE_N, DAC_ALIGN_12B_R);
+  /* MIDI input UART receive */
+  HAL_UART_Receive_IT(&huart1, uart_rx_data, MIDI_PACKET_SIZE);
 
-  // Init oscilllator stuff
+  /* Init oscilllator stuff */
   NCO_init(&oscillator, 40000, WF_SINE);
-  NCO_set_freq(&oscillator, 500);
+  NCO_set_freq(&oscillator, (int)midi_to_freq(69));
 
   ADSR_init(&adsr, 20000, 20000, 0.8, 10000);
-
-  audio_cbuff = cbuff_init(audio_buff, A_BUFF_SIZE);
 
   /* USER CODE END 2 */
 
@@ -198,21 +181,6 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-
-//	  NCO_set_freq(&oscillator, (int)midi_to_freq(69));
-
-	  volatile int del;
-	  for(int i = 0; i< 8; ++i)
-	  {
-		  NCO_set_freq(&oscillator, (int)midi_to_freq(sequence[i]));
-
-		  ADSR_note_on(&adsr);
-		  for(del = 0; del< 1000000; ++del);
-
-		  ADSR_note_off(&adsr);
-		  for(del = 0; del< 1000000; ++del);
-	  }
-
 
 //		itoa(sin_index, str_num, 10);
 //		itoa(TIM2->CNT, str_num, 10);
@@ -444,7 +412,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 115200;
+  huart1.Init.BaudRate = 9600;
   huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;
@@ -517,14 +485,13 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-volatile float new_sig;
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if	(htim->Instance == TIM2)
 	{
 		sig = NCO_next_signal(&oscillator);
-		new_sig = sig * ADSR_get_next(&adsr);
-		HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, (uint32_t)new_sig>>2);
+		sig = sig * ADSR_get_next(&adsr);
+		HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, (uint32_t)sig>>2);
 	}
 }
 

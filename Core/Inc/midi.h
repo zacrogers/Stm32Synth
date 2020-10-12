@@ -42,8 +42,8 @@ MIDI_Packet midi_parse(uint8_t *msg)
 
 	if(msg)
 	{
-		packet.control = (msg[0] & 0x0F);
-		packet.channel = (msg[0] & 0xF0);
+		packet.control = (msg[0] & 0xF0);
+		packet.channel = (msg[0] & 0x0F);
 		packet.note = msg[1];
 		packet.velocity = msg[2];
 	}
